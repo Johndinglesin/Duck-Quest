@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duck Quest: 200 Objectives</title>
+    <style>
+        :root {
+            --sky: #87CEEB;
+            --grass: #90EE90;
+            --duck-yellow: #FFD700;
+            --orange: #FF8C00;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--sky);
+            font-family: 'Comic Sans MS', 'Chalkboard SE', cursive;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            width: 90%;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .stats {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 3px solid white;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            pointer-events: auto;
+        }
+
+        #game-area {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at bottom, var(--grass) 0%, var(--sky) 100%);
+            cursor: none; /* Hide real cursor to show duck */
+        }
+
+        #duck {
+            position: fixed;
+            width: 60px;
+            height: 60px;
+            pointer-events: none;
+            z-index: 1000;
+            transition: transform 0.1s ease-out;
+            filter: drop-shadow(2px 4px 2px rgba(0,0,0,0.2));
+            display: none;
+        }
+
+        #duck .body {
+            background-color: var(--duck-yellow);
+            width: 100%;
+            height: 80%;
+            border-radius: 50% 50% 40% 40%;
+            position: absolute;
+            bottom: 0;
+        }
+
+        #duck .head {
+            background-color: var(--duck-yellow);
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            position: absolute;
+            top: 0;
+            right: 0;
+        }
+
+        #duck .beak {
+            background-color: var(--orange);
+            width: 15px;
+            height: 10px;
+            border-radius: 0 50% 50% 0;
+            position: absolute;
+            top: 15px;
+            right: -10px;
+        }
+
+        #duck .eye {
+            background: black;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            position: absolute;
+            top: 8px;
+            right: 8px;
+        }
+
+        .objective-target {
+            position: absolute;
+            padding: 15px 30px;
+            background: white;
+            border: 4px solid var(--orange);
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+            animation: float 3s infinite ease-in-out;
+            z-index: 50;
+        }
+
+        .objective-target:hover {
+            transform: scale(1.1);
+            background: #fff9e6;
+        }
+
+        #start-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            color: white;
+        }
+
+        #start-btn {
+            padding: 20px 60px;
+            font-size: 2rem;
+            background: var(--duck-yellow);
+            color: black;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-family: inherit;
+            box-shadow: 0 0 20px var(--duck-yellow);
+        }
+
+        #objective-text {
+            font-size: 1.5rem;
+            color: var(--orange);
+            text-align: center;
+            background: white;
+            padding: 10px 40px;
+            border-radius: 50px;
+            border: 4px solid var(--duck-yellow);
+            pointer-events: auto;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .particle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: var(--duck-yellow);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 999;
+        }
+    </style>
+</head>
+<body>
+
+<div id="start-overlay">
+    <h1>DUCK QUEST</h1>
+    <p>200 Objectives. One Rubber Duck. Infinite Glory.</p>
+    <button id="start-btn">START GAME</button>
+</div>
+
+<div id="ui-layer">
+    <div class="stats">Progress: <span id="count">0</span> / 200</div>
+    <div id="objective-text">Wait for it...</div>
+    <div class="stats">Level: <span id="lvl">1</span></div>
+</div>
+
+<div id="game-area">
+    <div id="duck">
+        <div class="body"></div>
+        <div class="head">
+            <div class="eye"></div>
+            <div class="beak"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const duck = document.getElementById('duck');
+    const startBtn = document.getElementById('start-btn');
+    const startOverlay = document.getElementById('start-overlay');
+    const gameArea = document.getElementById('game-area');
+    const countSpan = document.getElementById('count');
+    const lvlSpan = document.getElementById('lvl');
+    const objectiveText = document.getElementById('objective-text');
+
+    let currentObjective = 1;
+    let mouseX = 0;
+    let mouseY = 0;
+    let duckX = 0;
+    let duckY = 0;
+
+    // Movement smoothing
+    function animateDuck() {
+        let dx = mouseX - duckX;
+        let dy = mouseY - duckY;
+        
+        duckX += dx * 0.15;
+        duckY += dy * 0.15;
+        
+        duck.style.left = (duckX - 30) + 'px';
+        duck.style.top = (duckY - 30) + 'px';
+
+        // Flip duck based on direction
+        if (dx > 0) {
+            duck.style.transform = 'scaleX(1)';
+        } else {
+            duck.style.transform = 'scaleX(-1)';
+        }
+
+        requestAnimationFrame(animateDuck);
+    }
+
+    document.addEventListener('mousemove', (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+        if (Math.random() > 0.9) createTrail(mouseX, mouseY);
+    });
+
+    function createTrail(x, y) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        p.style.left = x + 'px';
+        p.style.top = y + 'px';
+        gameArea.appendChild(p);
+        setTimeout(() => {
+            p.style.transition = 'all 1s';
+            p.style.transform = 'translateY(50px) scale(0)';
+            p.style.opacity = '0';
+            setTimeout(() => p.remove(), 1000);
+        }, 10);
+    }
+
+    const verbs = ["Boop", "Smash", "Tickle", "Negotiate with", "Exterminate", "Gently touch", "Intimidate", "Worship", "Inspect"];
+    const nouns = ["The Button", "The Sphere", "The Orb", "The Cube", "The Widget", "The Thingy", "The Quacker", "The Secret", "The Void"];
+
+    function spawnObjective() {
+        // Clear old targets
+        const old = document.querySelector('.objective-target');
+        if (old) old.remove();
+
+        const target = document.createElement('div');
+        target.className = 'objective-target';
+        
+        // Dynamic labels for 200 objectives
+        const v = verbs[Math.floor(Math.random() * verbs.length)];
+        const n = nouns[Math.floor(Math.random() * nouns.length)];
+        target.innerText = `${v} ${n} #${currentObjective}`;
+        
+        objectiveText.innerText = `Objective ${currentObjective}: ${v} ${n}`;
+
+        // Random Position
+        const x = Math.random() * (window.innerWidth - 200) + 100;
+        const y = Math.random() * (window.innerHeight - 200) + 100;
+        
+        target.style.left = x + 'px';
+        target.style.top = y + 'px';
+
+        target.onclick = () => {
+            currentObjective++;
+            countSpan.innerText = currentObjective - 1;
+            lvlSpan.innerText = Math.floor(currentObjective / 10) + 1;
+            
+            if (currentObjective <= 200) {
+                spawnObjective();
+            } else {
+                objectiveText.innerText = "YOU ARE THE ULTIMATE DUCK MASTER!";
+                target.remove();
+            }
+        };
+
+        gameArea.appendChild(target);
+    }
+
+    startBtn.onclick = () => {
+        startOverlay.style.display = 'none';
+        duck.style.display = 'block';
+        animateDuck();
+        spawnObjective();
+    };
+
+</script>
+</body>
+</html>
